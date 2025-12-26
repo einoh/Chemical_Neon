@@ -228,6 +228,11 @@
             if (secondsLeft <= 0) {
                 stopTimer();
                 stopPolling();
+                // Reset UI immediately
+                document.getElementById('creditDisplay').innerText = "0.00";
+                document.getElementById('initialState').classList.remove('hidden');
+                document.getElementById('insertingState').classList.add('hidden');
+                localStorage.removeItem('vendo_lock_expiration');
                 checkStatus(); // Reset UI
             }
         }
