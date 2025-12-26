@@ -42,7 +42,8 @@ namespace Chemical_Neon.Controllers
                 {
                     IsLocked = isLocked,
                     LockedByMe = isLocked && isMySession,
-                    CurrentCredit = (isLocked && isMySession) ? credit : 0
+                    CurrentCredit = (isLocked && isMySession) ? credit : 0,
+                    LockExpiration = (isLocked && isMySession) ? expiry : (DateTime?)null
                 });
             }
 

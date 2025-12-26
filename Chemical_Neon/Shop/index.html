@@ -96,6 +96,8 @@
         }
 
         let pollInterval = null;
+        let timerInterval = null;
+        let lockExpiration = null;
 
         async function checkStatus() {
             try {
@@ -110,10 +112,19 @@
                     dot.className = "w-3 h-3 bg-red-500 rounded-full mr-2";
                     text.innerText = "Machine Busy (Someone is paying)";
                     document.getElementById('initialState').classList.add('opacity-50', 'pointer-events-none');
+                    stopTimer();
                 } else if (data.lockedByMe) {
                     // Locked by me
                     dot.className = "w-3 h-3 bg-orange-500 rounded-full mr-2";
                     text.innerText = "Ready for Coins";
+                    document.getElementById('creditDisplay').innerText = data.currentCredit.toFixed(2);
+                    
+                    // Store lock expiration and start countdown timer
+                    if (data.lockExpiration) {
+                        lockExpiration = new Date(data.lockExpiration);
+                        startTimer();
+                    }
+                    
                     enterInsertState(data.currentCredit);
                 } else {
                     // Free
@@ -123,6 +134,7 @@
                     document.getElementById('initialState').classList.remove('hidden');
                     document.getElementById('insertingState').classList.add('hidden');
                     stopPolling(); // Don't poll aggressively when idle
+                    stopTimer();
                 }
             } catch (e) {
                 console.error(e);
@@ -161,6 +173,10 @@
                     .then(data => {
                         if(data.lockedByMe) {
                             document.getElementById('creditDisplay').innerText = data.currentCredit.toFixed(2);
+                            // Update lock expiration for countdown timer
+                            if (data.lockExpiration) {
+                                lockExpiration = new Date(data.lockExpiration);
+                            }
                         } else {
                             // Lock expired or lost
                             checkStatus(); // Reset UI
@@ -177,6 +193,34 @@
             if (pollInterval) clearInterval(pollInterval);
             pollInterval = null;
             document.getElementById('timerDisplay').classList.add('hidden');
+        }
+
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            updateCountdown();
+            timerInterval = setInterval(updateCountdown, 1000);
+        }
+
+        function stopTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = null;
+            lockExpiration = null;
+        }
+
+        function updateCountdown() {
+            if (!lockExpiration) return;
+
+            const now = new Date();
+            const diff = lockExpiration - now;
+            const secondsLeft = Math.max(0, Math.floor(diff / 1000));
+
+            document.getElementById('timeLeft').innerText = secondsLeft;
+
+            // If time has expired, stop the timer
+            if (secondsLeft <= 0) {
+                stopTimer();
+                checkStatus(); // Reset UI
+            }
         }
 
         function enterInsertState(credit) {
@@ -199,6 +243,7 @@
                     document.getElementById('insertingState').classList.add('hidden');
                     document.getElementById('resultArea').classList.remove('hidden');
                     stopPolling();
+                    stopTimer();
                 } else {
                     alert(data || "Insufficient credit");
                 }
