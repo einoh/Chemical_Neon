@@ -113,19 +113,22 @@
                     text.innerText = "Machine Busy (Someone is paying)";
                     document.getElementById('initialState').classList.add('opacity-50', 'pointer-events-none');
                     stopTimer();
+                    localStorage.removeItem('vendo_lock_expiration');
                 } else if (data.lockedByMe) {
                     // Locked by me
                     dot.className = "w-3 h-3 bg-orange-500 rounded-full mr-2";
                     text.innerText = "Ready for Coins";
                     document.getElementById('creditDisplay').innerText = data.currentCredit.toFixed(2);
+                    document.getElementById('initialState').classList.remove('opacity-50', 'pointer-events-none');
                     
                     // Store lock expiration and start countdown timer
                     if (data.lockExpiration) {
                         lockExpiration = new Date(data.lockExpiration);
+                        localStorage.setItem('vendo_lock_expiration', lockExpiration.toISOString());
+                        enterInsertState(data.currentCredit);
                         startTimer();
+                        startPolling();
                     }
-                    
-                    enterInsertState(data.currentCredit);
                 } else {
                     // Free
                     dot.className = "w-3 h-3 bg-green-500 rounded-full mr-2";
@@ -135,6 +138,7 @@
                     document.getElementById('insertingState').classList.add('hidden');
                     stopPolling(); // Don't poll aggressively when idle
                     stopTimer();
+                    localStorage.removeItem('vendo_lock_expiration');
                 }
             } catch (e) {
                 console.error(e);
@@ -153,7 +157,7 @@
                 });
 
                 if (res.ok) {
-                    startPolling();
+                    checkStatus();
                 } else {
                     alert("Machine is busy, please wait a moment.");
                     checkStatus();
@@ -176,12 +180,16 @@
                             // Update lock expiration for countdown timer
                             if (data.lockExpiration) {
                                 lockExpiration = new Date(data.lockExpiration);
+                                localStorage.setItem('vendo_lock_expiration', lockExpiration.toISOString());
                             }
+                            // Ensure timer display is visible
+                            document.getElementById('timerDisplay').classList.remove('hidden');
                         } else {
                             // Lock expired or lost
                             checkStatus(); // Reset UI
                         }
-                    });
+                    })
+                    .catch(e => console.error('Polling error:', e));
             }, 1000);
 
             document.getElementById('initialState').classList.add('hidden');
@@ -219,6 +227,7 @@
             // If time has expired, stop the timer
             if (secondsLeft <= 0) {
                 stopTimer();
+                stopPolling();
                 checkStatus(); // Reset UI
             }
         }
@@ -244,6 +253,7 @@
                     document.getElementById('resultArea').classList.remove('hidden');
                     stopPolling();
                     stopTimer();
+                    localStorage.removeItem('vendo_lock_expiration');
                 } else {
                     alert(data || "Insufficient credit");
                 }
@@ -252,8 +262,36 @@
             }
         }
 
-        // Initial check
-        checkStatus();
+        // Restore session state on page load
+        function restoreSession() {
+            const storedExpiration = localStorage.getItem('vendo_lock_expiration');
+            if (storedExpiration) {
+                lockExpiration = new Date(storedExpiration);
+                // Only restore if expiration hasn't passed
+                if (lockExpiration > new Date()) {
+                    // Restore UI without calling checkStatus()
+                    const dot = document.getElementById('statusDot');
+                    const text = document.getElementById('statusText');
+                    dot.className = "w-3 h-3 bg-orange-500 rounded-full mr-2";
+                    text.innerText = "Ready for Coins";
+                    
+                    document.getElementById('creditDisplay').innerText = "0.00";
+                    document.getElementById('initialState').classList.remove('opacity-50', 'pointer-events-none');
+                    enterInsertState(0);
+                    startTimer();
+                    startPolling();
+                } else {
+                    // Expiration has passed, clean up
+                    localStorage.removeItem('vendo_lock_expiration');
+                    checkStatus();
+                }
+            } else {
+                checkStatus();
+            }
+        }
+
+        // Initial check - restore session or check status
+        restoreSession();
     </script>
 </body>
 </html>
