@@ -1,0 +1,214 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wi-Fi Vendo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f3f4f6;
+        }
+
+        .digital-display {
+            font-family: 'Courier New', Courier, monospace;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden">
+        <!-- Header -->
+        <div class="bg-blue-600 p-6 text-white text-center">
+            <h1 class="text-2xl font-bold"><i class="fas fa-wifi mr-2"></i>Branchette Systems Wi-Fi</h1>
+            <p class="text-blue-100 text-sm mt-1">Insert coins to buy time</p>
+        </div>
+
+        <!-- Status & Display -->
+        <div class="p-6 space-y-6">
+
+            <!-- Connection Status -->
+            <div id="statusBox" class="flex items-center justify-center text-sm font-semibold text-gray-500">
+                <span class="w-3 h-3 bg-gray-400 rounded-full mr-2" id="statusDot"></span>
+                <span id="statusText">Connecting to System...</span>
+            </div>
+
+            <!-- Digital Credit Display -->
+            <div class="bg-gray-900 rounded-xl p-6 text-center shadow-inner border-4 border-gray-800 relative">
+                <p class="text-gray-400 text-xs uppercase tracking-widest mb-1">Current Credit</p>
+                <div class="text-green-400 text-5xl font-bold digital-display drop-shadow-lg">
+                    ₱ <span id="creditDisplay">0.00</span>
+                </div>
+                <!-- Timer Overlay -->
+                <div id="timerDisplay" class="hidden absolute top-2 right-2 text-red-500 text-xs font-bold animate-pulse">
+                    CLOSING IN <span id="timeLeft">60</span>s
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div id="initialState">
+                <button onclick="lockMachine()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-xl transition transform active:scale-95 shadow-lg border-b-4 border-blue-800">
+                    <i class="fas fa-coins mr-2"></i> INSERT COIN
+                </button>
+                <p class="text-center text-xs text-gray-400 mt-2">Tap to reserve the coin slot</p>
+            </div>
+
+            <div id="insertingState" class="hidden space-y-4">
+                <div class="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded relative text-center text-sm animate-pulse">
+                    <strong>Machine Locked!</strong><br>Please insert coins now.
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="buyVoucher(60)" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow border-b-4 border-green-800">
+                        1 Hour (₱10)
+                    </button>
+                    <button onclick="buyVoucher(1440)" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg shadow border-b-4 border-purple-800">
+                        24 Hours (₱50)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Result Area -->
+            <div id="resultArea" class="hidden text-center p-4 bg-green-50 border border-green-200 rounded-lg">
+                <p class="text-green-800 font-bold">Voucher Code:</p>
+                <div class="text-2xl font-mono bg-white border p-2 mt-2 rounded select-all" id="voucherCode">---</div>
+                <p class="text-xs text-gray-500 mt-2">Screenshot this code!</p>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_URL = "http://localhost:83/api"; // CHANGE THIS to your .NET Server IP
+        const MACHINE_ID = "SITE_001";
+
+        // Generate a random Session ID for this tab
+        let sessionId = localStorage.getItem('vendo_session');
+        if (!sessionId) {
+            sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+            localStorage.setItem('vendo_session', sessionId);
+        }
+
+        let pollInterval = null;
+
+        async function checkStatus() {
+            try {
+                const response = await fetch(`${API_URL}/vending/status/${MACHINE_ID}?sessionId=${sessionId}`);
+                const data = await response.json();
+
+                const dot = document.getElementById('statusDot');
+                const text = document.getElementById('statusText');
+
+                if (data.isLocked && !data.lockedByMe) {
+                    // Locked by someone else
+                    dot.className = "w-3 h-3 bg-red-500 rounded-full mr-2";
+                    text.innerText = "Machine Busy (Someone is paying)";
+                    document.getElementById('initialState').classList.add('opacity-50', 'pointer-events-none');
+                } else if (data.lockedByMe) {
+                    // Locked by me
+                    dot.className = "w-3 h-3 bg-orange-500 rounded-full mr-2";
+                    text.innerText = "Ready for Coins";
+                    enterInsertState(data.currentCredit);
+                } else {
+                    // Free
+                    dot.className = "w-3 h-3 bg-green-500 rounded-full mr-2";
+                    text.innerText = "Machine Available";
+                    document.getElementById('initialState').classList.remove('opacity-50', 'pointer-events-none');
+                    document.getElementById('initialState').classList.remove('hidden');
+                    document.getElementById('insertingState').classList.add('hidden');
+                    stopPolling(); // Don't poll aggressively when idle
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function lockMachine() {
+            const btn = document.querySelector('button');
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Locking...';
+
+            try {
+                const res = await fetch(`${API_URL}/vending/lock`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ machineId: MACHINE_ID, sessionId: sessionId })
+                });
+
+                if (res.ok) {
+                    startPolling();
+                } else {
+                    alert("Machine is busy, please wait a moment.");
+                    checkStatus();
+                }
+            } catch(e) {
+                alert("Network error.");
+            }
+            btn.innerHTML = '<i class="fas fa-coins mr-2"></i> INSERT COIN';
+        }
+
+        function startPolling() {
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(() => {
+                // When locked by me, we check status constantly to see coin updates
+                fetch(`${API_URL}/vending/status/${MACHINE_ID}?sessionId=${sessionId}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if(data.lockedByMe) {
+                            document.getElementById('creditDisplay').innerText = data.currentCredit.toFixed(2);
+                        } else {
+                            // Lock expired or lost
+                            checkStatus(); // Reset UI
+                        }
+                    });
+            }, 1000);
+
+            document.getElementById('initialState').classList.add('hidden');
+            document.getElementById('insertingState').classList.remove('hidden');
+            document.getElementById('timerDisplay').classList.remove('hidden');
+        }
+
+        function stopPolling() {
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = null;
+            document.getElementById('timerDisplay').classList.add('hidden');
+        }
+
+        function enterInsertState(credit) {
+            document.getElementById('creditDisplay').innerText = credit.toFixed(2);
+            document.getElementById('initialState').classList.add('hidden');
+            document.getElementById('insertingState').classList.remove('hidden');
+        }
+
+        async function buyVoucher(minutes) {
+            try {
+                const res = await fetch(`${API_URL}/vending/buy`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ machineId: MACHINE_ID, sessionId: sessionId, durationMinutes: minutes })
+                });
+
+                const data = await res.json();
+                if(res.ok) {
+                    document.getElementById('voucherCode').innerText = data.code;
+                    document.getElementById('insertingState').classList.add('hidden');
+                    document.getElementById('resultArea').classList.remove('hidden');
+                    stopPolling();
+                } else {
+                    alert(data || "Insufficient credit");
+                }
+            } catch (e) {
+                alert("Error purchasing.");
+            }
+        }
+
+        // Initial check
+        checkStatus();
+    </script>
+</body>
+</html>
