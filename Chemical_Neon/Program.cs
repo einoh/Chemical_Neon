@@ -8,7 +8,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddSingleton<FileErrorLoggerService>();
 
-
+// Add IMemoryCache for SessionService
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<SessionService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddCors(options =>
