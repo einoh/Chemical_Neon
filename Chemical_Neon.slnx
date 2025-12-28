@@ -1,3 +1,4 @@
 <Solution>
-  <Project Path="Chemical_Neon/Chemical_Neon.csproj" />
+  <Project Path="Chemical_Neon_Hardware/Chemical_Neon_Hardware.csproj" Id="5fc839a5-8945-4c74-84e8-1977c0458da0" />
+  <Project Path="Chemical_Neon_Vending/Chemical_Neon_Vending.csproj" Id="4f2582fb-2608-4c17-905d-df984db8f4ef" />
 </Solution>
