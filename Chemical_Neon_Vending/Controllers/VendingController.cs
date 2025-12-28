@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using MySql.Data.MySqlClient;
 
-namespace Chemical_Neon_Vending.Controllers
+namespace Chemical_Neon.Controllers
 {
     public class SessionCreateRequest { public required string MachineId { get; set; } }
     public class LockRequest { public required string MachineId { get; set; } public required string SessionId { get; set; } }
@@ -13,8 +13,8 @@ namespace Chemical_Neon_Vending.Controllers
     public class VendingController(IConfiguration configuration, FileErrorLoggerService errorLogger, SessionService sessionService) : ControllerBase
     {
         private readonly string? _connectionString = configuration.GetConnectionString("constr");
-        private readonly FileErrorLoggerService _errorLogger = errorLogger;
-        private readonly SessionService _sessionService = sessionService;
+        private readonly FileErrorLoggerService _error_logger = errorLogger;
+        private readonly SessionService _session_service = sessionService;
 
         // 1. CLIENT: CREATE NEW SESSION REQUEST
         [HttpPost("session/create")]
@@ -23,20 +23,30 @@ namespace Chemical_Neon_Vending.Controllers
             if (string.IsNullOrWhiteSpace(req.MachineId))
                 return BadRequest("Invalid machine ID");
 
-            var token = _sessionService.CreateSession(req.MachineId);
+            var token = _session_service.CreateSession(req.MachineId);
             return Ok(new { sessionToken = token });
         }
 
         // 2. CLIENT: CHECK STATUS / POLL BALANCE
         [HttpGet("status/{machineId}")]
-        public async Task<IActionResult> GetStatus(string machineId, [FromHeader(Name = "X-Session-Token")] string sessionToken)
+        public async Task<IActionResult> GetStatus(string machineId)
         {
-            var session = _sessionService.ValidateSession(sessionToken);
-            if (session == null)
-                return Unauthorized("Invalid or expired session");
+            // Try to read session token from header first, then from query string as fallback
+            var sessionToken = string.Empty;
+            if (Request.Headers.TryGetValue("X-Session-Token", out var headerVals))
+            {
+                sessionToken = headerVals.ToString();
+            }
+            else if (Request.Query.TryGetValue("sessionToken", out var queryVals))
+            {
+                sessionToken = queryVals.ToString();
+            }
 
-            if (session.MachineId != machineId)
-                return Forbid("Session is for different machine");
+            SessionData? session = null;
+            if (!string.IsNullOrEmpty(sessionToken))
+            {
+                session = _session_service.ValidateSession(sessionToken);
+            }
 
             using var conn = new MySqlConnection(_connectionString);
             await conn.OpenAsync();
@@ -52,10 +62,14 @@ namespace Chemical_Neon_Vending.Controllers
                 var credit = reader.GetDecimal(2);
 
                 bool isLocked = lockedBy != null && expiry > DateTime.Now;
-                bool isMySession = lockedBy == sessionToken;
+                bool isMySession = session != null && lockedBy == sessionToken;
 
                 // If lock expired, we consider it free
                 if (lockedBy != null && expiry <= DateTime.Now) isLocked = false;
+
+                // If session is present but machine belongs to different machine, forbid details
+                if (session != null && session.MachineId != machineId)
+                    return Forbid("Session is for different machine");
 
                 return Ok(new
                 {
@@ -66,7 +80,7 @@ namespace Chemical_Neon_Vending.Controllers
                 });
             }
 
-            _errorLogger.LogError($"Machine not found : {machineId}, from {sessionToken}");
+            _error_logger.LogError($"Machine not found : {machineId}, from {sessionToken}");
             return NotFound("Machine not found");
         }
 
@@ -74,7 +88,7 @@ namespace Chemical_Neon_Vending.Controllers
         [HttpPost("lock")]
         public async Task<IActionResult> LockMachine([FromBody] LockRequest req)
         {
-            var session = _sessionService.ValidateSession(req.SessionId);
+            var session = _session_service.ValidateSession(req.SessionId);
             if (session == null)
                 return Unauthorized("Invalid or expired session");
 
@@ -107,7 +121,7 @@ namespace Chemical_Neon_Vending.Controllers
         [HttpPost("buy")]
         public async Task<IActionResult> BuyVoucher([FromBody] BuyRequest req)
         {
-            var session = _sessionService.ValidateSession(req.SessionId);
+            var session = _session_service.ValidateSession(req.SessionId);
             if (session == null)
                 return Unauthorized("Invalid or expired session");
 
@@ -148,7 +162,7 @@ namespace Chemical_Neon_Vending.Controllers
             updateCmd.Parameters.AddWithValue("@Id", req.MachineId);
             await updateCmd.ExecuteNonQueryAsync();
 
-            _errorLogger.LogError($"Voucher created: {voucherCode} for {req.MachineId} ({req.DurationMinutes} min)");
+            _error_logger.LogError($"Voucher created: {voucherCode} for {req.MachineId} ({req.DurationMinutes} min)");
             return Ok(new { code = voucherCode, durationMinutes = req.DurationMinutes });
         }
 
