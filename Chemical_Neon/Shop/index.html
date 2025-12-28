@@ -90,10 +90,42 @@
 
         // Session token (server-generated and secure)
         let sessionToken = null;
+        
+        // CSRF token for form protection
+        let csrfToken = null;
 
         let pollInterval = null;
         let timerInterval = null;
         let lockExpiration = null;
+
+        // Initialize CSRF token on page load
+        async function initializeCsrfToken() {
+            try {
+                const response = await fetch(`${API_URL}/vending/csrf-token`);
+                if (!response.ok) {
+                    console.error('Failed to get CSRF token');
+                    return;
+                }
+                
+                // Extract CSRF token from cookies
+                csrfToken = getCsrfTokenFromCookie();
+                if (csrfToken) {
+                    sessionStorage.setItem('csrf_token', csrfToken);
+                    console.log('CSRF token initialized');
+                }
+            } catch (e) {
+                console.error('CSRF token initialization failed:', e);
+            }
+        }
+
+        // Helper function to get CSRF token from cookies
+        function getCsrfTokenFromCookie() {
+            const name = 'XSRF-TOKEN';
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
 
         // Initialize session on page load
         async function initializeSession() {
@@ -112,6 +144,7 @@
                 const data = await response.json();
                 sessionToken = data.sessionToken;
                 sessionStorage.setItem('vendo_session_token', sessionToken);
+                console.log('Session token initialized');
                 checkStatus();
             } catch (e) {
                 console.error('Session initialization failed:', e);
@@ -119,16 +152,18 @@
         }
 
         // Restore session from sessionStorage or create new one
-        function restoreOrCreateSession() {
+        async function restoreOrCreateSession() {
             const storedToken = sessionStorage.getItem('vendo_session_token');
             const storedExpiration = localStorage.getItem('vendo_lock_expiration');
 
             if (storedToken) {
                 sessionToken = storedToken;
+                console.log('Session token restored from storage');
                 
                 if (storedExpiration) {
                     lockExpiration = new Date(storedExpiration);
                     if (lockExpiration > new Date()) {
+                        console.log('Lock expiration restored');
                         // Restore UI without calling checkStatus()
                         const dot = document.getElementById('statusDot');
                         const text = document.getElementById('statusText');
@@ -146,17 +181,38 @@
                     }
                 }
                 
-                checkStatus();
+                await checkStatus();
             } else {
-                initializeSession();
+                await initializeSession();
             }
         }
 
         async function checkStatus() {
+            // Don't call if sessionToken is not set
+            if (!sessionToken) {
+                console.error('Session token not available');
+                return;
+            }
+
             try {
                 const response = await fetch(`${API_URL}/vending/status/${MACHINE_ID}`, {
                     headers: { 'X-Session-Token': sessionToken }
                 });
+
+                // Handle 401 specifically
+                if (response.status === 401) {
+                    console.error('Session expired or invalid, creating new session');
+                    sessionStorage.removeItem('vendo_session_token');
+                    localStorage.removeItem('vendo_lock_expiration');
+                    await initializeSession();
+                    return;
+                }
+
+                if (!response.ok) {
+                    console.error('Failed to get status:', response.status);
+                    return;
+                }
+
                 const data = await response.json();
 
                 const dot = document.getElementById('statusDot');
@@ -196,7 +252,7 @@
                     localStorage.removeItem('vendo_lock_expiration');
                 }
             } catch (e) {
-                console.error(e);
+                console.error('Status check failed:', e);
             }
         }
 
@@ -209,7 +265,8 @@
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'X-Session-Token': sessionToken
+                        'X-Session-Token': sessionToken,
+                        'X-CSRF-TOKEN': csrfToken
                     },
                     body: JSON.stringify({ machineId: MACHINE_ID, sessionId: sessionToken })
                 });
@@ -308,7 +365,8 @@
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'X-Session-Token': sessionToken
+                        'X-Session-Token': sessionToken,
+                        'X-CSRF-TOKEN': csrfToken
                     },
                     body: JSON.stringify({ machineId: MACHINE_ID, sessionId: sessionToken, durationMinutes: minutes })
                 });
@@ -329,7 +387,8 @@
             }
         }
 
-        // Initialize on page load
+        // Initialize on page load - CSRF first, then session
+        initializeCsrfToken();
         restoreOrCreateSession();
     </script>
 </body>

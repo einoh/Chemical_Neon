@@ -11,14 +11,9 @@ namespace Chemical_Neon.Services
         public DateTime ExpiresAt { get; set; }
     }
 
-    public class SessionService
+    public class SessionService(IMemoryCache cache)
     {
-        private readonly IMemoryCache _cache;
-
-        public SessionService(IMemoryCache cache)
-        {
-            _cache = cache;
-        }
+        private readonly IMemoryCache _cache = cache;
 
         public string CreateSession(string machineId)
         {
@@ -38,9 +33,9 @@ namespace Chemical_Neon.Services
             return token;
         }
 
-        public SessionData ValidateSession(string token)
+        public SessionData? ValidateSession(string token)
         {
-            if (_cache.TryGetValue(token, out SessionData session))
+            if (_cache.TryGetValue(token, out var sessionObj) && sessionObj is SessionData session)
             {
                 if (session.ExpiresAt > DateTime.UtcNow)
                     return session;

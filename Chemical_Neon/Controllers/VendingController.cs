@@ -17,6 +17,15 @@ namespace Chemical_Neon.Controllers
         private readonly FileErrorLoggerService _errorLogger = errorLogger;
         private readonly SessionService _sessionService = sessionService;
 
+        // 0. CLIENT: GET CSRF TOKEN FOR FORM PROTECTION
+        [HttpGet("csrf-token")]
+        public IActionResult GetCsrfToken()
+        {
+            // Token is automatically added to response by AntiForgery middleware
+            // It's available in the XSRF-TOKEN cookie
+            return Ok(new { message = "CSRF token set in cookie" });
+        }
+
         // 1. CLIENT: CREATE NEW SESSION REQUEST
         [HttpPost("session/create")]
         public IActionResult CreateSession([FromBody] SessionCreateRequest req)
@@ -73,6 +82,7 @@ namespace Chemical_Neon.Controllers
 
         // 3. CLIENT: ATTEMPT TO LOCK MACHINE FOR SESSION (THE "INSERT COIN" BUTTON)
         [HttpPost("lock")]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> LockMachine([FromBody] LockRequest req)
         {
             var session = _sessionService.ValidateSession(req.SessionId);
@@ -106,6 +116,7 @@ namespace Chemical_Neon.Controllers
 
         // 4. CLIENT: BUY VOUCHER WITH SECURED SESSION
         [HttpPost("buy")]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> BuyVoucher([FromBody] BuyRequest req)
         {
             var session = _sessionService.ValidateSession(req.SessionId);
@@ -154,7 +165,7 @@ namespace Chemical_Neon.Controllers
         }
 
         // Helper method to generate voucher code
-        private string GenerateVoucherCode()
+        private static string GenerateVoucherCode()
         {
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
             var random = new Random();
