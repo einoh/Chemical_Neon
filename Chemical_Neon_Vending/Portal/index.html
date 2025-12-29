@@ -371,6 +371,14 @@
                 document.getElementById('initialState').classList.remove('hidden');
                 document.getElementById('insertingState').classList.add('hidden');
                 localStorage.removeItem('vendo_lock_expiration');
+                
+                // Restore button to original state
+                const btn = document.querySelector('#initialState button');
+                if (btn) {
+                    btn.innerHTML = '<i class="fas fa-coins mr-2"></i> INSERT COIN';
+                    btn.disabled = false;
+                }
+                
                 checkStatus(); // Reset UI
             }
         }
