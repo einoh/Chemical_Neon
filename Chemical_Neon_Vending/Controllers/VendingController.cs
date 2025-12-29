@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using MySql.Data.MySqlClient;
 
-namespace Chemical_Neon.Controllers
+namespace Chemical_Neon_Vending.Controllers
 {
     public class SessionCreateRequest { public required string MachineId { get; set; } }
     public class LockRequest { public required string MachineId { get; set; } public required string SessionId { get; set; } }
@@ -24,6 +24,7 @@ namespace Chemical_Neon.Controllers
                 return BadRequest("Invalid machine ID");
 
             var token = _session_service.CreateSession(req.MachineId);
+            _error_logger.LogError($"Session created for {req.MachineId}. Token: {token.Substring(0, 8)}...");
             return Ok(new { sessionToken = token });
         }
 
@@ -46,6 +47,10 @@ namespace Chemical_Neon.Controllers
             if (!string.IsNullOrEmpty(sessionToken))
             {
                 session = _session_service.ValidateSession(sessionToken);
+                if (session == null)
+                {
+                    _error_logger.LogError($"Session validation failed for token: {sessionToken.Substring(0, 8)}...");
+                }
             }
 
             using var conn = new MySqlConnection(_connectionString);
@@ -88,12 +93,20 @@ namespace Chemical_Neon.Controllers
         [HttpPost("lock")]
         public async Task<IActionResult> LockMachine([FromBody] LockRequest req)
         {
+            _error_logger.LogError($"Lock request for machine {req.MachineId} with session {req.SessionId.Substring(0, 8)}...");
+            
             var session = _session_service.ValidateSession(req.SessionId);
             if (session == null)
+            {
+                _error_logger.LogError($"Session validation failed for lock request. Token: {req.SessionId.Substring(0, 8)}...");
                 return Unauthorized("Invalid or expired session");
+            }
 
             if (session.MachineId != req.MachineId)
+            {
+                _error_logger.LogError($"Machine mismatch: session for {session.MachineId}, request for {req.MachineId}");
                 return Forbid("Session is for different machine");
+            }
 
             using var conn = new MySqlConnection(_connectionString);
             await conn.OpenAsync();
@@ -112,8 +125,13 @@ namespace Chemical_Neon.Controllers
 
             int rowsAffected = await cmd.ExecuteNonQueryAsync();
 
-            if (rowsAffected > 0) return Ok(new { message = "Machine locked for you. Insert coins now." });
+            if (rowsAffected > 0)
+            {
+                _error_logger.LogError($"Machine {req.MachineId} locked successfully");
+                return Ok(new { message = "Machine locked for you. Insert coins now." });
+            }
 
+            _error_logger.LogError($"Failed to lock machine {req.MachineId} - already locked");
             return BadRequest(new { message = "Machine is busy. Please wait." });
         }
 
@@ -167,7 +185,7 @@ namespace Chemical_Neon.Controllers
         }
 
         // Helper method to generate voucher code
-        private string GenerateVoucherCode()
+        private static string GenerateVoucherCode()
         {
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
             var random = new Random();
