@@ -1,4 +1,4 @@
-﻿namespace Chemical_Neon.Services
+﻿namespace Chemical_Neon_Vending.Services
 {
     public class FileErrorLoggerService
     {

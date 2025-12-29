@@ -1,4 +1,4 @@
-using Chemical_Neon.Services;
+using Chemical_Neon_Vending.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
