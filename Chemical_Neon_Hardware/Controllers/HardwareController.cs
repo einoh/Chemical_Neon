@@ -19,7 +19,6 @@ namespace Chemical_Neon_Hardware.Controllers
             using var conn = new MySqlConnection(_connectionString);
             await conn.OpenAsync();
 
-            // 1. Validate API Key
             var validateCmd = new MySqlCommand("SELECT RatePerPulse FROM VendingMachines WHERE MachineIdentifier = @Id AND ApiKey = @Key", conn);
             validateCmd.Parameters.AddWithValue("@Id", payload.MachineId);
             validateCmd.Parameters.AddWithValue("@Key", payload.ApiKey);
