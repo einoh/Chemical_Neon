@@ -24,7 +24,7 @@ namespace Chemical_Neon_Vending.Controllers
                 return BadRequest("Invalid machine ID");
 
             var token = _session_service.CreateSession(req.MachineId);
-            _error_logger.LogError($"Session created for {req.MachineId}. Token: {token.Substring(0, 8)}...");
+            _error_logger.LogError($"Session created for {req.MachineId}. Token: {token[..8]}...");
             return Ok(new { sessionToken = token });
         }
 
@@ -49,7 +49,7 @@ namespace Chemical_Neon_Vending.Controllers
                 session = _session_service.ValidateSession(sessionToken);
                 if (session == null)
                 {
-                    _error_logger.LogError($"Session validation failed for token: {sessionToken.Substring(0, 8)}...");
+                    _error_logger.LogError($"Session validation failed for token: {sessionToken[..8]}...");
                 }
             }
 
@@ -93,12 +93,12 @@ namespace Chemical_Neon_Vending.Controllers
         [HttpPost("lock")]
         public async Task<IActionResult> LockMachine([FromBody] LockRequest req)
         {
-            _error_logger.LogError($"Lock request for machine {req.MachineId} with session {req.SessionId.Substring(0, 8)}...");
+            _error_logger.LogError($"Lock request for machine {req.MachineId} with session {req.SessionId[..8]}...");
             
             var session = _session_service.ValidateSession(req.SessionId);
             if (session == null)
             {
-                _error_logger.LogError($"Session validation failed for lock request. Token: {req.SessionId.Substring(0, 8)}...");
+                _error_logger.LogError($"Session validation failed for lock request. Token: {req.SessionId[..8]}...");
                 return Unauthorized("Invalid or expired session");
             }
 
