@@ -5,7 +5,7 @@
  * UPDATES IN v3:
  * - Uses HMAC-SHA256 signature verification (secure)
  * - Sends timestamp to prevent replay attacks
- * - No external libraries required - includes own SHA256/HMAC implementation
+ * - Uses Rweather's Arduino Cryptography Library (professional, battle-tested)
  * 
  * --- WIRING GUIDE ---
  * Coin Signal Wire:  D3 (Must be D2 or D3 for interrupts)
@@ -18,11 +18,17 @@
  * !!! SAFETY WARNING !!!
  * Ensure your Coin Acceptor signal does NOT send 12V to the Arduino.
  * Use a diode or voltage divider if the signal is powered.
+ * 
+ * !!! LIBRARY REQUIREMENT !!!
+ * Install Rweather's "Crypto" library:
+ * https://github.com/rweather/arduinolibs
+ * Or via Arduino IDE: Sketch ? Include Library ? Manage Libraries ? Search "Crypto" by Rweather
  */
 
 #include <SPI.h>
 #include <Ethernet.h>
-#include "sha256.h"  // Built-in SHA256/HMAC implementation (no external libs needed)
+#include <Crypto.h>
+#include <SHA256.h>
 
 // ==========================================
 //      HARDWARE CONFIGURATION (EDIT HERE)
@@ -94,6 +100,7 @@ void setup() {
   Serial.println(serverPort);
   Serial.print(F("? Machine ID: "));
   Serial.println(machineId);
+  Serial.println(F("? Using Rweather Crypto Library (HMAC-SHA256)"));
   
   // Blink LED to indicate ready
   for(int i=0; i<3; i++) {
@@ -135,20 +142,50 @@ void onCoinPulse() {
 // ==========================================
 
 /**
- * Computes HMAC-SHA256 signature and converts to hex string
+ * Computes HMAC-SHA256 signature using Rweather's Crypto library
+ * and converts to hex string
  * Message format: "machineId:pulseCount:timestamp"
  */
 void computeHmacSignature(const char* message, char* output) {
-  uint8_t hmacResult[32];
-  uint32_t messageLen = strlen(message);
+  uint8_t keyBytes[32];
   uint32_t keyLen = strlen(hmacSecretKey);
   
-  // Compute HMAC-SHA256
-  hmac_sha256(
-    (const uint8_t*)hmacSecretKey, keyLen,
-    (const uint8_t*)message, messageLen,
-    hmacResult
-  );
+  // Copy secret key (it's an ASCII string)
+  memcpy(keyBytes, hmacSecretKey, keyLen);
+  
+  uint8_t hmacResult[32];
+  
+  // Create SHA256 hasher and HMAC it with the key
+  // Rweather's library uses a different API: Hash object + manual HMAC computation
+  SHA256 sha256;
+  
+  // HMAC-SHA256 algorithm:
+  // 1. Create inner padding: key XOR 0x36
+  uint8_t innerPad[64];
+  uint8_t outerPad[64];
+  
+  for (int i = 0; i < 64; i++) {
+    if (i < keyLen) {
+      innerPad[i] = keyBytes[i] ^ 0x36;
+      outerPad[i] = keyBytes[i] ^ 0x5C;
+    } else {
+      innerPad[i] = 0x36;
+      outerPad[i] = 0x5C;
+    }
+  }
+  
+  // 2. Inner hash: hash(innerPad + message)
+  sha256.reset();
+  sha256.update(innerPad, 64);
+  sha256.update((const uint8_t*)message, strlen(message));
+  uint8_t innerHash[32];
+  sha256.finalize(innerHash, 32);
+  
+  // 3. Outer hash: hash(outerPad + innerHash)
+  sha256.reset();
+  sha256.update(outerPad, 64);
+  sha256.update(innerHash, 32);
+  sha256.finalize(hmacResult, 32);
   
   // Convert to hex string
   for(int i = 0; i < 32; i++) {
@@ -158,7 +195,7 @@ void computeHmacSignature(const char* message, char* output) {
 }
 
 void sendCoinData(int pulses) {
-  Serial.print(F("?? Sending "));
+  Serial.print(F(">> Sending "));
   Serial.print(pulses);
   Serial.println(F(" pulses..."));
   
@@ -179,6 +216,8 @@ void sendCoinData(int pulses) {
   Serial.println(message);
   Serial.print(F("   Signature: "));
   Serial.println(signature);
+  Serial.print(F("   Secret Key: "));
+  Serial.println(hmacSecretKey);
 
   // Attempt connection
   if (client.connect(serverIp, serverPort)) {

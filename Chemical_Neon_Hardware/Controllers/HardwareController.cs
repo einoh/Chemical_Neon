@@ -30,22 +30,40 @@ namespace Chemical_Neon_Hardware.Controllers
                 return StatusCode(500, new { error = "Server configuration error" });
             }
 
+            // Log incoming request for debugging
+            _error_logger.LogError($"[ReceiveCoin] Received request - Machine: {payload.MachineId}, Pulses: {payload.PulseCount}, Timestamp: {payload.Timestamp}, Signature: {payload.Signature[..16]}...");
+
             // Validate timestamp to prevent replay attacks
             if (!HmacService.IsTimestampValid(payload.Timestamp))
             {
-                _error_logger.LogError($"Invalid timestamp for {payload.MachineId}: {payload.Timestamp}");
-                return Unauthorized(new { error = "Timestamp expired or invalid" });
+                _error_logger.LogError($"❌ Invalid timestamp for {payload.MachineId}: {payload.Timestamp} (Difference from now is too large - possible time sync issue)");
+                return Unauthorized(new { error = "Timestamp expired or invalid. Check Arduino time synchronization." });
             }
+
+            _error_logger.LogError($"✓ Timestamp valid for {payload.MachineId}: {payload.Timestamp}");
 
             // Compute expected signature
             var payloadString = $"{payload.MachineId}:{payload.PulseCount}";
+            var fullMessage = $"{payloadString}:{payload.Timestamp}";
             
-            // Verify HMAC signature
-            if (!HmacService.VerifySignature(payloadString, payload.Timestamp, _hmacSecretKey, payload.Signature))
+            // Log the exact message and signature for debugging
+            _error_logger.LogError($"   Computing HMAC with message: '{fullMessage}'");
+            _error_logger.LogError($"   Received signature: {payload.Signature}");
+            
+            // Verify HMAC signature with debugging
+            var (signatureValid, computedSig) = HmacService.VerifySignatureWithDebug(payloadString, payload.Timestamp, _hmacSecretKey, payload.Signature);
+            _error_logger.LogError($"   Computed signature: {computedSig}");
+            _error_logger.LogError($"   Match: {signatureValid}");
+            
+            if (!signatureValid)
             {
-                _error_logger.LogError($"Invalid HMAC signature for machine {payload.MachineId}");
+                _error_logger.LogError($"❌ Invalid HMAC signature for machine {payload.MachineId}. Message: '{fullMessage}'");
+                _error_logger.LogError($"      Expected: {computedSig}");
+                _error_logger.LogError($"      Received: {payload.Signature}");
                 return Unauthorized(new { error = "Invalid signature" });
             }
+
+            _error_logger.LogError($"✓ Signature valid for {payload.MachineId}");
 
             using var conn = new MySqlConnection(_connectionString);
             await conn.OpenAsync();
@@ -59,9 +77,11 @@ namespace Chemical_Neon_Hardware.Controllers
             var machineExists = await validateCmd.ExecuteScalarAsync();
             if (machineExists == null)
             {
-                _error_logger.LogError($"Machine not found or not locked: {payload.MachineId}");
+                _error_logger.LogError($"❌ Machine not found or not locked: {payload.MachineId}");
                 return BadRequest(new { error = "Machine not found or not locked" });
             }
+
+            _error_logger.LogError($"✓ Machine {payload.MachineId} is locked and ready");
 
             // Get rate per pulse for this machine
             var getRateCmd = new MySqlCommand(
@@ -88,7 +108,7 @@ namespace Chemical_Neon_Hardware.Controllers
 
             await updateCmd.ExecuteNonQueryAsync();
 
-            _error_logger.LogError($"Received {payload.PulseCount} pulses for {payload.MachineId}. Added ₱{valueToAdd}. Signature verified successfully.");
+            _error_logger.LogError($"✅ SUCCESS: {payload.PulseCount} pulses for {payload.MachineId}. Added ₱{valueToAdd}. Signature verified. New balance credited.");
             return Ok(new { success = true, creditAdded = valueToAdd });
         }
     }
