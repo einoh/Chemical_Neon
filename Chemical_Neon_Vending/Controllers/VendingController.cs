@@ -165,11 +165,23 @@ namespace Chemical_Neon_Vending.Controllers
             if (lockedBy != req.SessionId)
                 return Forbid("This session does not own the lock");
 
-            // Generate voucher code
-            var voucherCode = GenerateVoucherCode();
+            // Fetch voucher code from database
+            await reader.CloseAsync();
+            
+            var voucherCode = await GetAvailableVoucherCode(conn, req.MachineId, req.DurationMinutes);
+            
+            if (string.IsNullOrEmpty(voucherCode))
+            {
+                _error_logger.LogError($"No available vouchers for machine {req.MachineId} with duration {req.DurationMinutes} minutes");
+                return BadRequest("No vouchers available for this duration");
+            }
+
+            // Mark voucher as used
+            using var updateVoucherCmd = new MySqlCommand("UPDATE vouchers SET IsUsed = NOW() WHERE Code = @Code", conn);
+            updateVoucherCmd.Parameters.AddWithValue("@Code", voucherCode);
+            await updateVoucherCmd.ExecuteNonQueryAsync();
 
             // Reset credit after purchase
-            await reader.CloseAsync();
             using var updateCmd = new MySqlCommand(@"
             UPDATE VendingMachines 
             SET CurrentCredit = 0,
@@ -184,15 +196,20 @@ namespace Chemical_Neon_Vending.Controllers
             return Ok(new { code = voucherCode, durationMinutes = req.DurationMinutes });
         }
 
-        // Helper method to generate voucher code
-        private static string GenerateVoucherCode()
+        // Helper method to fetch available voucher code from database
+        private static async Task<string?> GetAvailableVoucherCode(MySqlConnection conn, string machineId, int durationMinutes)
         {
-            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-            var random = new Random();
-            var result = new System.Text.StringBuilder(12);
-            for (int i = 0; i < 12; i++)
-                result.Append(chars[random.Next(chars.Length)]);
-            return result.ToString();
+            using var cmd = new MySqlCommand("SELECT vouchers.`Code` FROM vouchers WHERE vouchers.MachineIdentifier = @MachineId AND vouchers.DurationMinutes = @Duration AND vouchers.IsUsed IS NULL LIMIT 1", conn);
+            cmd.Parameters.AddWithValue("@MachineId", machineId);
+            cmd.Parameters.AddWithValue("@Duration", durationMinutes);
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
+            {
+                return reader.GetString(0);
+            }
+
+            return null;
         }
     }
 }
