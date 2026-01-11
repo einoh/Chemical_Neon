@@ -30,8 +30,14 @@ namespace Chemical_Neon_Hardware.Controllers
                 return StatusCode(500, new { error = "Server configuration error" });
             }
 
-            // Log incoming request for debugging
-            _error_logger.LogError($"[ReceiveCoin] Received request - Machine: {payload.MachineId}, Pulses: {payload.PulseCount}, Timestamp: {payload.Timestamp}, Signature: {payload.Signature[..16]}...");
+            // Log incoming request for debugging - safely handle short signatures
+            var signaturePreview = string.IsNullOrEmpty(payload.Signature)
+                ? "[empty]"
+                : payload.Signature.Length > 16
+                    ? $"{payload.Signature[..16]}..."
+                    : payload.Signature;
+
+            _error_logger.LogError($"[ReceiveCoin] Received request - Machine: {payload.MachineId}, Pulses: {payload.PulseCount}, Timestamp: {payload.Timestamp}, Signature: {signaturePreview}");
 
             // Validate timestamp to prevent replay attacks
             if (!HmacService.IsTimestampValid(payload.Timestamp))
