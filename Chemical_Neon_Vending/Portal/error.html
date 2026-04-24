@@ -38,21 +38,19 @@
                     </div>
                 </div>
                 <form method="post" action="$PORTAL_ACTION$" class="space-y-3">
-                    <input
-                        name="auth_voucher"
-                        type="text"
-                        placeholder="e.g. ABCD-EFGH-IJKL"
-                        autocomplete="off"
-                        class="w-full rounded-xl px-3 py-2.5 text-gray-800 bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300"
-                    >
+                    <input name="auth_voucher"
+                           type="text"
+                           placeholder="e.g. ABCD-EFGH-IJKL"
+                           autocomplete="off"
+                           class="w-full rounded-xl px-3 py-2.5 text-gray-800 bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300">
+                    <p class="text-red-500 text-xs mt-1">Incorrect or invalid voucher code. Please try again.</p>
+
                     <input name="redirurl" type="hidden" value="$PORTAL_REDIRURL$">
                     <input name="zone" type="hidden" value="$PORTAL_ZONE$">
-                    <button
-                        name="accept"
-                        type="submit"
-                        value="Continue"
-                        class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition"
-                    >
+                    <button name="accept"
+                            type="submit"
+                            value="Continue"
+                            class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition">
                         <i class="fas fa-arrow-right-to-bracket mr-2"></i>Connect Now
                     </button>
                 </form>
@@ -155,7 +153,6 @@
     </div>
 
     <script>
-        // Configuration
         const API_URL = "https://dpkwru.golden-success.com/api";
         const MACHINE_ID = "GSCCEBU";
 
