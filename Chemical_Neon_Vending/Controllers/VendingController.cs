@@ -168,8 +168,11 @@ namespace Chemical_Neon_Vending.Controllers
             // Fetch voucher code from database
             await reader.CloseAsync();
             
-            var voucherCode = await GetAvailableVoucherCode(conn, req.MachineId, req.DurationMinutes);
-            
+            var (voucherCode, isInsufficientCredit) = await GetAvailableVoucherCode(conn, req.MachineId, req.DurationMinutes);
+
+            if (isInsufficientCredit)
+                return BadRequest("Insufficient credit for selected duration");
+
             if (string.IsNullOrEmpty(voucherCode))
             {
                 _error_logger.LogError($"No available vouchers for machine {req.MachineId} with duration {req.DurationMinutes} minutes");
@@ -197,8 +200,28 @@ namespace Chemical_Neon_Vending.Controllers
         }
 
         // Helper method to fetch available voucher code from database
-        private static async Task<string?> GetAvailableVoucherCode(MySqlConnection conn, string machineId, int durationMinutes)
+        private static async Task<(string? VoucherCode, bool IsInsufficientCredit)> GetAvailableVoucherCode(MySqlConnection conn, string machineId, int durationMinutes)
         {
+            decimal requiredCredit = durationMinutes switch
+            {
+                60 => 5m,
+                180 => 10m,
+                480 => 20m,
+                1440 => 40m,
+                _ => decimal.MaxValue
+            };
+
+            using var creditCmd = new MySqlCommand("SELECT CurrentCredit FROM VendingMachines WHERE MachineIdentifier = @MachineId LIMIT 1", conn);
+            creditCmd.Parameters.AddWithValue("@MachineId", machineId);
+
+            var creditObj = await creditCmd.ExecuteScalarAsync();
+            if (creditObj == null || creditObj == DBNull.Value)
+                return (null, false);
+
+            var currentCredit = Convert.ToDecimal(creditObj);
+            if (currentCredit < requiredCredit)
+                return (null, true);
+
             using var cmd = new MySqlCommand("SELECT vouchers.`Code` FROM vouchers WHERE vouchers.MachineIdentifier = @MachineId AND vouchers.DurationMinutes = @Duration AND vouchers.IsUsed IS NULL LIMIT 1", conn);
             cmd.Parameters.AddWithValue("@MachineId", machineId);
             cmd.Parameters.AddWithValue("@Duration", durationMinutes);
@@ -206,10 +229,10 @@ namespace Chemical_Neon_Vending.Controllers
             using var reader = await cmd.ExecuteReaderAsync();
             if (await reader.ReadAsync())
             {
-                return reader.GetString(0);
+                return (reader.GetString(0), false);
             }
 
-            return null;
+            return (null, false);
         }
     }
 }
