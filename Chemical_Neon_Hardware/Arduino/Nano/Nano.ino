@@ -45,8 +45,8 @@
 
 // 3. NETWORK SETTINGS
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-IPAddress serverIp(192, 168, 1, 16);  // The local IP of your .NET Server PC
-int serverPort = 83;                // Usually 80, 8080, or 5000
+const char* serverHost = "chymzj.golden-success.com";  // Domain only (no http://)
+int serverPort = 80;                // HTTP default port
 
 // 4. SECURITY - HMAC Configuration
 // MUST match the HmacSecretKey in your .NET appsettings.json
@@ -95,7 +95,7 @@ void setup() {
   Serial.print(F("? Connected! Device IP: "));
   Serial.println(Ethernet.localIP());
   Serial.print(F("? Server: "));
-  Serial.print(serverIp);
+  Serial.print(serverHost);
   Serial.print(F(":"));
   Serial.println(serverPort);
   Serial.print(F("? Machine ID: "));
@@ -220,7 +220,7 @@ void sendCoinData(int pulses) {
   Serial.println(hmacSecretKey);
 
   // Attempt connection
-  if (client.connect(serverIp, serverPort)) {
+  if (client.connect(serverHost, serverPort)) {
     // Construct JSON Payload with HMAC signature
     String jsonPayload = "{";
     jsonPayload += "\"machineId\":\"" + String(machineId) + "\",";
@@ -236,7 +236,7 @@ void sendCoinData(int pulses) {
     // Send HTTP POST
     client.println(F("POST /api/hardware/coin HTTP/1.1"));
     client.print(F("Host: "));
-    client.print(serverIp);
+    client.print(serverHost);
     client.print(F(":"));
     client.println(serverPort);
     client.println(F("Content-Type: application/json"));
@@ -249,7 +249,7 @@ void sendCoinData(int pulses) {
     Serial.println(F("? Data sent successfully!"));
     client.stop();
   } else {
-    Serial.println(F("? Connection Failed. Check Server IP/Port."));
+    Serial.println(F("? Connection Failed. Check Server Host/Port."));
   }
   
   digitalWrite(STATUS_LED_PIN, LOW);
