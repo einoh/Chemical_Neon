@@ -50,7 +50,7 @@ int serverPort = 80;                // HTTP default port
 
 // 4. SECURITY - HMAC Configuration
 // MUST match the HmacSecretKey in your .NET appsettings.json
-const char* machineId = "SITE_001";
+const char* machineId = "GSCCEBU";
 const char* hmacSecretKey = "b83f29aae116030da1bac6691471c8fa";
 
 // ==========================================
