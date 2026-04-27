@@ -407,7 +407,7 @@
                     } else if (res.status === 403) {
                         showModal("Session mismatch. Please refresh the page.");
                     } else {
-                        showModal(errorData?.message || "Machine is busy, please wait a moment.");
+                        showModal(errorData?.message || "Machine is busy (someone is paying), please retry again later.");
                         checkStatus();
                     }
                 }
