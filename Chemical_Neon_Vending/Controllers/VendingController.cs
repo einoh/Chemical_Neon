@@ -132,7 +132,7 @@ namespace Chemical_Neon_Vending.Controllers
             }
 
             _error_logger.LogError($"Failed to lock machine {req.MachineId} - already locked");
-            return BadRequest(new { message = "Machine is busy. Please wait." });
+            return BadRequest(new { message = "Machine is busy (someone is paying), please retry again later." });
         }
 
         // 4. CLIENT: BUY VOUCHER WITH SECURED SESSION
