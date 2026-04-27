@@ -81,7 +81,7 @@ namespace Chemical_Neon_Vending.Controllers
                     IsLocked = isLocked,
                     LockedByMe = isMySession && isLocked,
                     CurrentCredit = (isLocked && isMySession) ? credit : 0,
-                    LockExpiration = (isLocked && isMySession) ? expiry : (DateTime?)null
+                    LockExpiration = (isLocked && isMySession) ? (expiry.HasValue ? DateTime.SpecifyKind(expiry.Value, DateTimeKind.Local) : (DateTime?)null) : (DateTime?)null
                 });
             }
 
