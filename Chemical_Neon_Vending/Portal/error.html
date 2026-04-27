@@ -4,13 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wi-Fi Vendo</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="tailwind.js"></script>
+    <link href="all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Century Gothic', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #f3f4f6;
         }
 
@@ -25,12 +23,12 @@
     <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden">
         <!-- Header -->
         <div class="bg-blue-600 p-6 text-white text-center">
-            <h1 class="text-2xl font-bold"><i class="fas fa-wifi mr-2"></i>GSC WiFi</h1>
+            <h1 class="text-2xl font-bold">GSC WiFi</h1>
 
             <div class="mt-4 bg-white text-gray-800 rounded-2xl p-4 text-left shadow-lg border border-blue-100">
                 <div class="flex items-center gap-2 mb-3">
                     <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
-                        <i class="fas fa-ticket-alt text-sm"></i>
+                        ?
                     </div>
                     <div>
                         <p class="text-sm font-extrabold text-gray-800 leading-tight">Already have a voucher?</p>
@@ -44,14 +42,13 @@
                            autocomplete="off"
                            class="w-full rounded-xl px-3 py-2.5 text-gray-800 bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300">
                     <p class="text-red-500 text-xs mt-1">Incorrect or invalid voucher code. Please try again.</p>
-
                     <input name="redirurl" type="hidden" value="$PORTAL_REDIRURL$">
                     <input name="zone" type="hidden" value="$PORTAL_ZONE$">
                     <button name="accept"
                             type="submit"
                             value="Continue"
                             class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition">
-                        <i class="fas fa-arrow-right-to-bracket mr-2"></i>Connect Now
+                        Connect Now
                     </button>
                 </form>
             </div>
@@ -89,7 +86,7 @@
             <!-- Action Buttons -->
             <div id="initialState">
                 <button onclick="lockMachine()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-xl transition transform active:scale-95 shadow-lg border-b-4 border-blue-800">
-                    <i class="fas fa-coins mr-2"></i> INSERT COIN
+                    INSERT COIN
                 </button>
                 <p class="text-center text-xs text-gray-400 mt-2">Tap to reserve the vending machine</p>
             </div>
@@ -120,14 +117,12 @@
                 <p class="text-green-800 font-bold">Voucher Code:</p>
                 <div class="mt-2 flex items-center gap-2">
                     <div class="flex-1 text-2xl font-mono bg-white border p-2 rounded select-all" id="voucherCode">---</div>
-                    <button
-                        type="button"
-                        onclick="copyVoucherCode()"
-                        class="h-12 w-12 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center transition"
-                        title="Copy voucher code"
-                        aria-label="Copy voucher code"
-                    >
-                        <i class="fas fa-copy"></i>
+                    <button type="button"
+                            onclick="copyVoucherCode()"
+                            class="h-12 w-12 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center transition"
+                            title="Copy voucher code"
+                            aria-label="Copy voucher code">
+                        Copy
                     </button>
                 </div>
                 <p class="text-xs text-red-500 mt-2">Screenshot this code, if you want to use it later.</p>
@@ -142,7 +137,7 @@
             <div class="flex items-start justify-between gap-3">
                 <h2 class="text-lg font-bold text-gray-800">Notice</h2>
                 <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600" aria-label="Close">
-                    <i class="fas fa-times"></i>
+                    Close
                 </button>
             </div>
             <p id="appModalMessage" class="mt-3 text-sm text-gray-600"></p>
@@ -153,6 +148,7 @@
     </div>
 
     <script>
+        // Configuration
         const API_URL = "https://dpkwru.golden-success.com/api";
         const MACHINE_ID = "GSCCEBU";
 
@@ -179,7 +175,7 @@
         function restoreInsertCoinButton() {
             const btn = document.querySelector('#initialState button');
             if (!btn) return;
-            btn.innerHTML = '<i class="fas fa-coins mr-2"></i> INSERT COIN';
+            btn.innerHTML = 'INSERT COIN';
             btn.disabled = false;
         }
 
@@ -251,7 +247,7 @@
 
             if (storedToken) {
                 sessionToken = storedToken;
-                
+
                 if (storedExpiration) {
                     lockExpiration = new Date(storedExpiration);
                     if (lockExpiration > new Date()) {
@@ -260,7 +256,7 @@
                         const text = document.getElementById('statusText');
                         dot.className = "w-3 h-3 bg-orange-500 rounded-full mr-2";
                         text.innerText = "Ready for Coins";
-                        
+
                         document.getElementById('creditDisplay').innerText = "0.00";
                         document.getElementById('initialState').classList.remove('opacity-50', 'pointer-events-none');
                         enterInsertState(0);
@@ -271,7 +267,7 @@
                         localStorage.removeItem('vendo_lock_expiration');
                     }
                 }
-                
+
                 checkStatus();
             } else {
                 initializeSession();
@@ -288,7 +284,7 @@
                 const response = await fetch(`${API_URL}/vending/status/${MACHINE_ID}`, {
                     headers: { 'X-Session-Token': sessionToken }
                 });
-                
+
                 if (!response.ok) {
                     console.error('Status check failed:', response.status);
                     return;
@@ -312,7 +308,7 @@
                     text.innerText = "Ready for Coins";
                     document.getElementById('creditDisplay').innerText = data.currentCredit.toFixed(2);
                     document.getElementById('initialState').classList.remove('opacity-50', 'pointer-events-none');
-                    
+
                     // Store lock expiration and start countdown timer
                     if (data.lockExpiration) {
                         lockExpiration = new Date(data.lockExpiration);
@@ -346,9 +342,9 @@
         async function lockMachine() {
             const btn = document.querySelector('#initialState button');
             if (!btn) return;
-            
+
             const originalHtml = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Locking...';
+            btn.innerHTML = 'Locking...';
             btn.disabled = true;
 
             let res = null;
@@ -362,10 +358,10 @@
                 }
 
                 console.log('Attempting to lock machine with sessionToken:', sessionToken.substring(0, 8) + '...');
-                
+
                 res = await fetch(`${API_URL}/vending/lock`, {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         'X-Session-Token': sessionToken
                     },
@@ -373,7 +369,7 @@
                 });
 
                 console.log('Lock response status:', res.status);
-                
+
                 // Try to parse response as JSON
                 let errorData = null;
                 const contentType = res.headers.get('content-type');
@@ -394,7 +390,7 @@
                     checkStatus();
                 } else {
                     console.error('Lock failed with status:', res.status, 'Data:', errorData);
-                    
+
                     if (res.status === 401) {
                         showModal("Session expired. Please refresh the page.");
                         // Clear expired session
@@ -406,11 +402,11 @@
                     } else if (res.status === 403) {
                         showModal("Session mismatch. Please refresh the page.");
                     } else {
-                        showModal(errorData?.message || "Machine is busy, please wait a moment.");
+                        showModal(errorData?.message || "Machine is busy (someone is paying), please retry again later.");
                         checkStatus();
                     }
                 }
-            } catch(e) {
+            } catch (e) {
                 console.error('Network error:', e);
                 showModal("Network error. Make sure the server is running at " + API_URL);
             } finally {
@@ -429,7 +425,7 @@
                 })
                     .then(r => r.json())
                     .then(data => {
-                        if(data.lockedByMe) {
+                        if (data.lockedByMe) {
                             document.getElementById('creditDisplay').innerText = data.currentCredit.toFixed(2);
                             // Update lock expiration for countdown timer
                             if (data.lockExpiration) {
@@ -487,14 +483,14 @@
                 document.getElementById('initialState').classList.remove('hidden');
                 document.getElementById('insertingState').classList.add('hidden');
                 localStorage.removeItem('vendo_lock_expiration');
-                
+
                 // Restore button to original state
                 const btn = document.querySelector('#initialState button');
                 if (btn) {
-                    btn.innerHTML = '<i class="fas fa-coins mr-2"></i> INSERT COIN';
+                    btn.innerHTML = 'INSERT COIN';
                     btn.disabled = false;
                 }
-                
+
                 checkStatus(); // Reset UI
             }
         }
@@ -509,7 +505,7 @@
             try {
                 const res = await fetch(`${API_URL}/vending/buy`, {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         'X-Session-Token': sessionToken
                     },
@@ -517,7 +513,7 @@
                 });
 
                 const data = await res.json();
-                if(res.ok) {
+                if (res.ok) {
                     document.getElementById('voucherCode').innerText = data.code;
                     document.getElementById('insertingState').classList.add('hidden');
                     document.getElementById('resultArea').classList.remove('hidden');
